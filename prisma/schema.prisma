@@ -1,0 +1,139 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model status {
+  id          Int           @id @default(autoincrement())
+  type        String
+  permissions permissions[]
+}
+
+model users {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  profile   profile?
+  auth      auth?
+
+  @@index([id])
+}
+
+model profile {
+  id             String @id @default(uuid())
+  username       String @unique @map("user_name")
+  profileImageId Int    @map("profile_image_id")
+  userId         String @unique @map("user_id")
+  user           users  @relation(fields: [userId], references: [id])
+
+  preferences preferences[]
+
+  @@index([username])
+}
+
+model auth {
+  id           String         @id @default(uuid())
+  blocked      Boolean        @default(false)
+  restricted   Boolean        @default(false)
+  userId       String         @unique @map("user_id")
+  user         users          @relation(fields: [userId], references: [id])
+  authInfo     auth_info?
+  authSecurity auth_security?
+}
+
+model auth_info {
+  id       String @id @default(uuid())
+  email    String @unique @db.VarChar(255)
+  password String
+  authId   String @unique @map("auth_id")
+  auth     auth   @relation(fields: [authId], references: [id])
+
+  @@index([email])
+}
+
+model auth_security {
+  id                     String                 @id @default(uuid())
+  timeToLogin            DateTime?              @map("time_to_login")
+  timeToChangePassword   DateTime?              @map("time_to_change_password")
+  loginAttempts          Int                    @default(0)
+  passwordChangeAttempts Int                    @default(0)
+  authId                 String                 @unique
+  auth                   auth                   @relation(fields: [authId], references: [id])
+  activeSessions         active_sessions[]
+  blacklistedSessions    blacklisted_sessions[]
+}
+
+model roles {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String    @db.VarChar(120)
+  active      Boolean   @default(true)
+  hidden      Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  permissions permissions[]
+
+  @@index([id, name])
+}
+
+model permissions {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String    @db.VarChar(120)
+  statusId    Int
+  status      status    @relation(fields: [statusId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  userRoles roles[]
+}
+
+model preferences {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  active      Boolean   @default(true)
+  hidden      Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  profile profile[]
+
+  @@index([name])
+}
+
+model active_sessions {
+  id             String    @id @default(uuid())
+  token          String
+  validUntil     DateTime  @map("valid_until")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime? @updatedAt @map("updated_at")
+  authSecurityId String
+
+  authSecurity auth_security @relation(fields: [authSecurityId], references: [id])
+}
+
+model blacklisted_sessions {
+  id             String        @id @default(uuid())
+  jti            String
+  expired        Boolean       @default(false)
+  wasLogout      Boolean       @default(false) @map("was_logout")
+  expiredAt      DateTime
+  authSecurityId String
+  authSecurity   auth_security @relation(fields: [authSecurityId], references: [id])
+}
