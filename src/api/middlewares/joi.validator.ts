@@ -3,7 +3,7 @@ import { badRequest } from "@hapi/boom";
 import type { Schema } from "joi";
 import type { Request, RequestHandler } from "express";
 
-const ValidateSchema =
+export const ValidateSchema =
   (schema: Schema, property: keyof Request): RequestHandler =>
   (req, res, next) => {
     const data = req[property];
@@ -13,7 +13,3 @@ const ValidateSchema =
 
     next();
   };
-
-module.exports = {
-  ValidateSchema,
-};

@@ -50,6 +50,7 @@ model auth {
   user         users          @relation(fields: [userId], references: [id])
   authInfo     auth_info?
   authSecurity auth_security?
+  roles        roles[]
 }
 
 model auth_info {
@@ -85,6 +86,7 @@ model roles {
   deletedAt   DateTime? @map("deleted_at")
 
   permissions permissions[]
+  auth        auth[]
 
   @@index([id, name])
 }
@@ -99,7 +101,7 @@ model permissions {
   updatedAt   DateTime? @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  userRoles roles[]
+  roles roles[]
 }
 
 model preferences {
@@ -119,7 +121,7 @@ model preferences {
 
 model active_sessions {
   id             String    @id @default(uuid())
-  token          String
+  jti            String
   validUntil     DateTime  @map("valid_until")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime? @updatedAt @map("updated_at")
