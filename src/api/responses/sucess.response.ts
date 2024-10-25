@@ -9,7 +9,7 @@ export const SuccessResponseBoth = <T>(
 ) => {
   res.status(statusCode).json({
     error: false,
-    data,
+    data: data,
     message,
     statusCode,
   });

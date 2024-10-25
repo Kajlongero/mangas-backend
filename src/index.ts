@@ -1,3 +1,5 @@
+require("./api/auth/index");
+
 import { Server } from "socket.io";
 import express from "express";
 import cors from "cors";

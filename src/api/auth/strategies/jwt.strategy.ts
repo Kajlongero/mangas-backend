@@ -12,14 +12,16 @@ const bearerOpts: StrategyOptionsWithoutRequest = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
 };
 
-const bearerCb: VerifyCallback = <T>(payload: T, done: VerifiedCallback) => {};
+const bearerCb: VerifyCallback = <T>(payload: T, done: VerifiedCallback) =>
+  done(null, payload);
 
 const bodyOpts: StrategyOptionsWithoutRequest = {
   secretOrKey: ServerConfig.JWT_SECRET as string,
-  jwtFromRequest: ExtractJwt.fromBodyField("refresh_token"),
+  jwtFromRequest: ExtractJwt.fromBodyField("refreshToken"),
 };
 
-const bodyCb: VerifyCallback = <T>(payload: T, done: VerifiedCallback) => {};
+const bodyCb: VerifyCallback = <T>(payload: T, done: VerifiedCallback) =>
+  done(null, payload);
 
 export const JwtBearer = new Strategy(bearerOpts, bearerCb);
 export const JwtBody = new Strategy(bodyOpts, bodyCb);

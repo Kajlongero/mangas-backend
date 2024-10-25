@@ -67,9 +67,9 @@ model auth_security {
   id                     String                 @id @default(uuid())
   timeToLogin            DateTime?              @map("time_to_login")
   timeToChangePassword   DateTime?              @map("time_to_change_password")
-  loginAttempts          Int                    @default(0)
-  passwordChangeAttempts Int                    @default(0)
-  authId                 String                 @unique
+  loginAttempts          Int                    @default(0) @map("login_attempts")
+  passwordChangeAttempts Int                    @default(0) @map("password_change_attempts")
+  authId                 String                 @unique @map("auth_id")
   auth                   auth                   @relation(fields: [authId], references: [id])
   activeSessions         active_sessions[]
   blacklistedSessions    blacklisted_sessions[]
@@ -125,7 +125,7 @@ model active_sessions {
   validUntil     DateTime  @map("valid_until")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime? @updatedAt @map("updated_at")
-  authSecurityId String
+  authSecurityId String    @map("auth_security_id")
 
   authSecurity auth_security @relation(fields: [authSecurityId], references: [id])
 }
@@ -135,7 +135,7 @@ model blacklisted_sessions {
   jti            String
   expired        Boolean       @default(false)
   wasLogout      Boolean       @default(false) @map("was_logout")
-  expiredAt      DateTime
-  authSecurityId String
+  expiredAt      DateTime      @map("expired_at")
+  authSecurityId String        @map("auth_security_id")
   authSecurity   auth_security @relation(fields: [authSecurityId], references: [id])
 }
