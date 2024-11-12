@@ -31,60 +31,60 @@ model users {
 }
 
 model profile {
-  id             String @id @default(uuid())
-  username       String @unique @map("user_name")
-  profileImageId Int    @map("profile_image_id")
-  userId         String @unique @map("user_id")
-  user           users  @relation(fields: [userId], references: [id])
-
-  preferences preferences[]
+  id                Int                @id @default(autoincrement())
+  username          String             @unique @map("user_name")
+  description       String?
+  userId            String             @unique @map("user_id")
+  user              users              @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  preferences       preferences[]
+  profile_images    profile_images?
+  background_images background_images?
 
   @@index([username])
 }
 
 model auth {
-  id           String         @id @default(uuid())
+  id           Int            @id @default(autoincrement())
   blocked      Boolean        @default(false)
   restricted   Boolean        @default(false)
   userId       String         @unique @map("user_id")
-  user         users          @relation(fields: [userId], references: [id])
+  user         users          @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
   authInfo     auth_info?
   authSecurity auth_security?
   roles        roles[]
 }
 
 model auth_info {
-  id       String @id @default(uuid())
+  id       Int    @id @default(autoincrement())
   email    String @unique @db.VarChar(255)
   password String
-  authId   String @unique @map("auth_id")
-  auth     auth   @relation(fields: [authId], references: [id])
+  authId   Int    @unique @map("auth_id")
+  auth     auth   @relation(fields: [authId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([email])
 }
 
 model auth_security {
-  id                     String                 @id @default(uuid())
+  id                     Int                    @id @default(autoincrement())
   timeToLogin            DateTime?              @map("time_to_login")
   timeToChangePassword   DateTime?              @map("time_to_change_password")
   loginAttempts          Int                    @default(0) @map("login_attempts")
   passwordChangeAttempts Int                    @default(0) @map("password_change_attempts")
-  authId                 String                 @unique @map("auth_id")
-  auth                   auth                   @relation(fields: [authId], references: [id])
+  authId                 Int                    @unique @map("auth_id")
+  auth                   auth                   @relation(fields: [authId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   activeSessions         active_sessions[]
   blacklistedSessions    blacklisted_sessions[]
 }
 
 model roles {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  description String    @db.VarChar(120)
-  active      Boolean   @default(true)
-  hidden      Boolean   @default(false)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime? @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
-
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
+  description String        @db.VarChar(120)
+  active      Boolean       @default(true)
+  hidden      Boolean       @default(false)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime?     @updatedAt @map("updated_at")
+  deletedAt   DateTime?     @map("deleted_at")
   permissions permissions[]
   auth        auth[]
 
@@ -100,8 +100,9 @@ model permissions {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
+  roles       roles[]
 
-  roles roles[]
+  @@index([name])
 }
 
 model preferences {
@@ -113,29 +114,76 @@ model preferences {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
-
-  profile profile[]
+  profile     profile[]
 
   @@index([name])
 }
 
 model active_sessions {
-  id             String    @id @default(uuid())
-  jti            String
-  validUntil     DateTime  @map("valid_until")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime? @updatedAt @map("updated_at")
-  authSecurityId String    @map("auth_security_id")
-
-  authSecurity auth_security @relation(fields: [authSecurityId], references: [id])
+  id             String        @id @default(uuid())
+  jti            String        @unique
+  validUntil     DateTime      @map("valid_until")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime?     @updatedAt @map("updated_at")
+  authSecurityId Int           @map("auth_security_id")
+  authSecurity   auth_security @relation(fields: [authSecurityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model blacklisted_sessions {
   id             String        @id @default(uuid())
-  jti            String
+  jti            String        @unique
   expired        Boolean       @default(false)
   wasLogout      Boolean       @default(false) @map("was_logout")
   expiredAt      DateTime      @map("expired_at")
-  authSecurityId String        @map("auth_security_id")
-  authSecurity   auth_security @relation(fields: [authSecurityId], references: [id])
+  authSecurityId Int           @map("auth_security_id")
+  authSecurity   auth_security @relation(fields: [authSecurityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model images {
+  id                Int                @id @default(autoincrement())
+  url               String
+  width             Int?
+  height            Int?
+  imageStoreId      Int?               @map("image_store_id")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime?          @updatedAt @map("updated_at")
+  deletedAt         DateTime?          @map("deleted_at")
+  imagesStore       images_store?      @relation(fields: [imageStoreId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  profile_images    profile_images?
+  background_images background_images?
+}
+
+model images_store {
+  id        Int       @id @default(autoincrement())
+  url       String
+  keyword   String    @unique
+  active    Boolean
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  images    images[]
+}
+
+model profile_images {
+  id          Int       @id @default(autoincrement())
+  description String?
+  imageId     Int       @unique @map("image_id")
+  profileId   Int?      @unique @map("profile_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  images      images    @relation(fields: [imageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  profile     profile?  @relation(fields: [profileId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model background_images {
+  id          Int       @id @default(autoincrement())
+  description String?
+  imageId     Int       @unique @map("image_id")
+  profileId   Int?      @unique @map("profile_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  images      images    @relation(fields: [imageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  profile     profile?  @relation(fields: [profileId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 }

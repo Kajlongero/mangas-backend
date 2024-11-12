@@ -12,18 +12,31 @@ import {
 } from "../utils/jwt.functions";
 import { isHigherDate } from "../shared/utils/is.higher.date";
 import { CalculateLoginWaitTime } from "./utils/wait.time";
-
-type RegisterInfo = {
-  email: string;
-  password: string;
-  username: string;
-};
+import { AccessTokenPayload, RefreshTokenPayload } from "./types/token.model";
+import { LoginModel, RegisterModel } from "./interfaces/auth.model";
 
 export class AuthService {
-  public async generateTokenPair(token: JwtPayload) {
-    const jti = token.jti as string;
-    const sid = token.sid as string;
-    const authId = token.sub as string;
+  public async validateAccessToken(payload: AccessTokenPayload) {
+    const userId = payload.uid;
+
+    const user = await prisma.users.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        deletedAt: true,
+      },
+    });
+    if (!user) throw boom.notFound("User not found");
+    if (user.deletedAt) throw boom.notFound("User has been deleted");
+
+    return true;
+  }
+  public async generateTokenPair(payload: RefreshTokenPayload) {
+    const jti = payload.jti as string;
+    const sid = payload.sid as string;
+    const authId = Number(payload.sub);
 
     const transaction = await prisma.$transaction(async (tx) => {
       const blacklisted = await prisma.blacklisted_sessions.findFirst({
@@ -80,7 +93,7 @@ export class AuthService {
     const atPayload: JwtPayload = {
       iat: Date.now(),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 15,
-      sub: transaction?._user.auth?.id,
+      sub: `${transaction?._user.auth?.id}`,
       uid: transaction?._user.id,
       jti: uuid1,
       aud: ["http://localhost:3001/api/v1"],
@@ -89,11 +102,11 @@ export class AuthService {
       ],
     };
 
-    const rtPayload: JwtPayload = {
+    const rtPayload: RefreshTokenPayload = {
       iat: Date.now(),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 180,
       sid: sid,
-      sub: transaction?._user.auth?.id,
+      sub: `${transaction?._user.auth?.id}`,
       jti: uuid2,
       aud: ["http://localhost:3001/api/v1"],
     };
@@ -103,7 +116,7 @@ export class AuthService {
         data: {
           jti: jti as string,
           expiredAt: new Date().toISOString() as string,
-          authSecurityId: transaction._user.auth?.authSecurity?.id as string,
+          authSecurityId: transaction._user.auth?.authSecurity?.id as number,
           expired: true,
           wasLogout: false,
         },
@@ -130,7 +143,6 @@ export class AuthService {
       RefreshToken: rt,
     };
   }
-
   private async findEmail(email: string) {
     const user = await prisma.users.findFirst({
       where: {
@@ -162,8 +174,7 @@ export class AuthService {
 
     return user;
   }
-
-  public async login(data: Omit<RegisterInfo, "username">) {
+  public async login(data: LoginModel) {
     const { email, password } = data;
 
     const exists = await prisma.auth.findFirst({
@@ -233,8 +244,14 @@ export class AuthService {
               },
             },
           },
+          profile: {
+            select: {
+              id: true,
+            },
+          },
         },
       });
+      if (!_user) throw boom.unauthorized("Invalid credentials");
 
       const _session = await tx.active_sessions.create({
         data: {
@@ -266,23 +283,24 @@ export class AuthService {
       };
     });
 
-    const atPayload: JwtPayload = {
+    const atPayload: AccessTokenPayload = {
       iat: Date.now(),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 15,
-      sub: transaction?._user?.auth?.id,
-      uid: transaction?._user?.id,
+      sub: transaction?._user?.auth?.id.toString(),
+      pid: transaction._user.profile?.id as number,
+      uid: transaction?._user?.id as string,
       jti: uuid2,
       aud: ["http://localhost:3001/api/v1"],
-      roles: [
-        transaction._user?.auth?.roles.map((role) => role.name.toUpperCase()),
-      ],
+      roles: transaction._user?.auth?.roles.map(
+        (elem) => elem.name
+      ) as string[],
     };
 
-    const rtPayload: JwtPayload = {
+    const rtPayload: RefreshTokenPayload = {
       iat: Date.now(),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 180,
       sid: transaction._session.id,
-      sub: transaction?._user?.auth?.id,
+      sub: transaction?._user?.auth?.id.toString(),
       jti: uuid1,
       aud: ["http://localhost:3001/api/v1"],
     };
@@ -295,8 +313,7 @@ export class AuthService {
       RefreshToken: rt,
     };
   }
-
-  public async register(data: RegisterInfo) {
+  public async register(data: RegisterModel) {
     const emailTaken = await this.findEmail(data.email);
     if (emailTaken) throw boom.conflict("Email already taken");
 
@@ -318,6 +335,7 @@ export class AuthService {
           name: "READER",
         },
       });
+      if (!_role) throw boom.badData("Role not found");
 
       const _user = await tx.users.create({
         data: {},
@@ -338,10 +356,9 @@ export class AuthService {
         },
       });
 
-      const profile = await tx.profile.create({
+      const _profile = await tx.profile.create({
         data: {
           username: data.username,
-          profileImageId: 0,
           user: {
             connect: {
               id: _user.id,
@@ -387,29 +404,31 @@ export class AuthService {
       });
       return {
         _user,
+        _profile,
         _auth,
         _role,
         _session,
       };
     });
 
-    const atPayload: JwtPayload = {
+    const atPayload: AccessTokenPayload = {
       jti: uuid2,
       aud: ["http://localhost:3001/api/v1"],
       iat: Date.now(),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 15,
-      sub: transaction._auth.id,
       uid: transaction._user.id,
+      sub: transaction._auth.id.toString(),
+      pid: transaction._profile.id,
       roles: [transaction._role?.name],
     };
 
-    const rtPayload: JwtPayload = {
+    const rtPayload: RefreshTokenPayload = {
       jti: uuid1,
       aud: ["http://localhost:3001/api/v1"],
       iat: Date.now(),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 180,
       sid: transaction._session.id,
-      sub: transaction._auth.id,
+      sub: transaction._auth.id.toString(),
     };
 
     const at = SignAccessToken(atPayload, {});

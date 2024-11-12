@@ -7,6 +7,7 @@ import { JwtSchema, LoginSchema, RegisterSchema } from "./model";
 import { AuthService } from "./service";
 import { JwtPayload } from "jsonwebtoken";
 import { SuccessResponseBoth } from "../../responses/sucess.response";
+import { RefreshTokenPayload } from "./types/token.model";
 
 const instance = new AuthService();
 
@@ -14,11 +15,14 @@ const router = Router();
 
 router.post(
   "/refresh-token",
+  ValidateSchema(JwtSchema, "body"),
   passport.authenticate("jwt-body", { session: false }),
   async (req, res, next) => {
     try {
       const data = req.user;
-      const tokenPair = await instance.generateTokenPair(data as JwtPayload);
+      const tokenPair = await instance.generateTokenPair(
+        data as RefreshTokenPayload
+      );
 
       SuccessResponseBoth(req, res, tokenPair, "Success", 200);
     } catch (error) {
@@ -30,7 +34,7 @@ router.post(
 router.post(
   "/login",
   ValidateSchema(LoginSchema, "body"),
-  passport.authenticate("local"),
+  passport.authenticate("local", { session: false }),
   async (req, res, next) => {
     try {
       const data = req.user;
@@ -48,7 +52,6 @@ router.post(
   async (req, res, next) => {
     try {
       const body = req.body;
-      console.log(body);
 
       const tokenPair = await instance.register(body);
 
